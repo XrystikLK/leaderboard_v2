@@ -1,19 +1,16 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param } from "@nestjs/common";
 import { SteamService } from './app.service';
 
 @Controller('steam')
 export class AppController {
-  constructor(
-    private readonly steamService: SteamService,
-  ) { }
+  constructor(private readonly steamService: SteamService) {}
 
   @Get('/resolveURL/:id')
   async test(@Param('id') id: string) {
-    const data = await this.steamService.getTestData();
-    const hello = this.steamService.getHello();
+    const test = await this.steamService.getUserSteamId(id);
+    console.log("test", test)
     return {
-      message: `This action returns a #${id} cat; hello: ${hello}`,
-      data,
+      message: `Steam user ${id} processed.`,
     };
   }
 
