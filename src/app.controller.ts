@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from "@nestjs/common";
+import { Controller, Get, Param } from '@nestjs/common';
 import { SteamService } from './app.service';
 
 @Controller('steam')
@@ -7,8 +7,7 @@ export class AppController {
 
   @Get('/resolveURL/:id')
   async test(@Param('id') id: string) {
-    const test = await this.steamService.getUserSteamId(id);
-    console.log("test", test)
+    const test = await this.steamService.recordUserStats(id);
     return {
       message: `Steam user ${id} processed.`,
     };
@@ -22,5 +21,10 @@ export class AppController {
   @Get('/friends/:steamid')
   async getFriends(@Param('steamid') id: string) {
     return this.steamService.getFriendList(id);
+  }
+
+  @Get('/summaries/:steamids')
+  async getSummaries(@Param('steamids') steamids: string[]) {
+    return this.steamService.getPlayerSummaries(steamids);
   }
 }
