@@ -22,4 +22,4 @@ import { SupabaseModule } from 'nestjs-supabase-js';
   controllers: [AppController],
   providers: [SteamService],
 })
-export class AppModule { }
+export class AppModule {}

@@ -28,15 +28,10 @@ export class SteamService {
   }
 
   async getTestData() {
-    const { data, error } = await this.supabase.from('test').select();
-
-    if (error) {
-      throw new InternalServerErrorException(
-        `Database query failed: ${error.message}`,
-      );
-    }
-
-    return data;
+    return this.fetchDb(
+      this.supabase.from('test').select(),
+      'Database query failed',
+    );
   }
 
   async getOwnedGames(steamId: string) {
@@ -105,15 +100,13 @@ export class SteamService {
       return [];
     }
 
-    const { error } = await this.supabase
-      .from('users')
-      .upsert(usersToUpsert, { ignoreDuplicates: true });
+    await this.fetchDb(
+      this.supabase
+        .from('users')
+        .upsert(usersToUpsert, { ignoreDuplicates: true }),
+      'Database upsert failed for users',
+    );
 
-    if (error) {
-      throw new InternalServerErrorException(
-        `Database upsert failed: ${error.message}`,
-      );
-    }
     await this.recordFriendships(id);
 
     return usersToUpsert;
@@ -132,19 +125,13 @@ export class SteamService {
       friend_id: friend.steamid,
     }));
 
-    const { error } = await this.supabase
-      .from('friendship')
-      .upsert(friendshipData, {
+    await this.fetchDb(
+      this.supabase.from('friendship').upsert(friendshipData, {
         onConflict: 'user_id,friend_id',
         ignoreDuplicates: true,
-      });
-
-    if (error) {
-      console.log(error);
-      throw new InternalServerErrorException(
-        `Database upsert failed for friendships: ${error.message}`,
-      );
-    }
+      }),
+      'Database upsert failed for friendships',
+    );
 
     return friendshipData;
   }
@@ -184,15 +171,12 @@ export class SteamService {
       return [];
     }
 
-    const { error } = await this.supabase
-      .from('games')
-      .upsert(toUpsert, { onConflict: 'id', ignoreDuplicates: true });
-
-    if (error) {
-      throw new InternalServerErrorException(
-        `Database upsert failed for games: ${error.message}`,
-      );
-    }
+    await this.fetchDb(
+      this.supabase
+        .from('games')
+        .upsert(toUpsert, { onConflict: 'id', ignoreDuplicates: true }),
+      'Database upsert failed for games',
+    );
 
     return toUpsert;
   }
@@ -260,18 +244,12 @@ export class SteamService {
     const chunkSize = 1000;
     for (let i = 0; i < statsToUpsert.length; i += chunkSize) {
       const chunk = statsToUpsert.slice(i, i + chunkSize);
-      const { error: statsError } = await this.supabase
-        .from('game_stats')
-        .upsert(chunk, {
+      await this.fetchDb(
+        this.supabase.from('game_stats').upsert(chunk, {
           ignoreDuplicates: true,
-        });
-
-      if (statsError) {
-        console.log(chunk);
-        throw new InternalServerErrorException(
-          `Game stats upsert failed: ${statsError.message}`,
-        );
-      }
+        }),
+        'Game stats upsert failed',
+      );
     }
 
     return statsToUpsert;
@@ -285,6 +263,28 @@ export class SteamService {
       },
     );
     return response.response.steamid;
+  }
+
+  async getUserGamesFromDB(id: string) {
+    const data = await this.fetchDb(
+      this.supabase.from('game_stats').select().eq('steam_id', id),
+      'Failed to fetch user games from database',
+    );
+    console.log(data);
+    return data;
+  }
+
+  private async fetchDb<T>(
+    request: PromiseLike<{ data: T | null; error: any }>,
+    errorMessage: string = 'Database operation failed',
+  ): Promise<T> {
+    const { data, error } = await request;
+    if (error) {
+      throw new InternalServerErrorException(
+        `${errorMessage}: ${error.message}`,
+      );
+    }
+    return data as T;
   }
 
   private async fetchSteamApi<T = any>(
