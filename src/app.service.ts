@@ -101,9 +101,10 @@ export class SteamService {
     }
 
     await this.fetchDb(
-      this.supabase
-        .from('users')
-        .upsert(usersToUpsert, { ignoreDuplicates: true }),
+      this.supabase.from('users').upsert(usersToUpsert, {
+        onConflict: 'steam_id',
+        ignoreDuplicates: true,
+      }),
       'Database upsert failed for users',
     );
 
@@ -270,7 +271,17 @@ export class SteamService {
       this.supabase.from('game_stats').select().eq('steam_id', id),
       'Failed to fetch user games from database',
     );
-    console.log(data);
+    return data;
+  }
+
+  async getGameLeaderboard(steamid: string, appid: string) {
+    const data = await this.fetchDb(
+      this.supabase.rpc('get_leaderboard', {
+        target_steam_id: steamid,
+        target_appid: appid,
+      }),
+      'Failed to fetch leaderboard from database',
+    );
     return data;
   }
 
