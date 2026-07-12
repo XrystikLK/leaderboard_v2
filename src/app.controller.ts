@@ -1,6 +1,7 @@
 import { Controller, Get, Param } from "@nestjs/common";
 import { SteamService } from './app.service';
-
+import { ApiOkResponse } from '@nestjs/swagger';
+import { LeaderboardResponseDto } from './dto/app-responses.dto';
 @Controller('steam')
 export class AppController {
   constructor(private readonly steamService: SteamService) {}
@@ -30,7 +31,10 @@ export class AppController {
   }
 
   @Get('/leaderboard/:steamid/:appid')
-  async getLeaderboard(@Param('steamid') steamid: string, @Param('appid') appid: string) {
+  async getLeaderboard(
+    @Param('steamid') steamid: string,
+    @Param('appid') appid: string,
+  ): Promise<LeaderboardResponseDto[]> {
     return this.steamService.getGameLeaderboard(steamid, appid);
   }
 

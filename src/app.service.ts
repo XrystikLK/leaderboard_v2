@@ -15,7 +15,7 @@ import type {
 } from '@oddlaceguy49/steam-web-api-types/types/ISteamUser';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { InjectSupabaseClient } from 'nestjs-supabase-js';
-
+import type { LeaderboardResponse } from './common/db.types';
 @Injectable()
 export class SteamService {
   constructor(
@@ -274,7 +274,10 @@ export class SteamService {
     return data;
   }
 
-  async getGameLeaderboard(steamid: string, appid: string) {
+  async getGameLeaderboard(
+    steamid: string,
+    appid: string,
+  ): Promise<LeaderboardResponse> {
     const data = await this.fetchDb(
       this.supabase.rpc('get_leaderboard', {
         target_steam_id: steamid,
