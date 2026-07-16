@@ -24,8 +24,8 @@ export class AppController {
   }
 
 	@Get('/friends/:steamid')
-  async getFriends(@Param('steamid') id: string) {
-    return this.steamService.getFriendList(id);
+  async getFriends(@Param('steamid') id: string): Promise<UserDto[]> {
+    return this.steamService.getFriendsFromDb(id);
   }
 
 	@Get('/summaries/:steamids')
@@ -36,7 +36,7 @@ export class AppController {
 	@Get("/leaderboard/:steamid/:appid")
 	async getLeaderboard(
 		@Param('steamid') steamid: string,
-		@Param('appid') appid: string,
+		@Param('appid') appid: string,  
 	): Promise<LeaderboardResponseDto[]> {
 		return this.steamService.getGameLeaderboard(steamid, appid);
 	}

@@ -18,6 +18,7 @@ import type {
 import { SupabaseClient } from "@supabase/supabase-js";
 import { InjectSupabaseClient } from "nestjs-supabase-js";
 import type { LeaderboardResponse } from "./common/db.types";
+import type { UserDto } from "./dto/app-responses.dto";
 @Injectable()
 export class SteamService {
 	constructor(
@@ -54,6 +55,30 @@ export class SteamService {
 				steamid: steamId,
 				relationship: "friend",
 			},
+		);
+	}
+
+	async getFriendsFromDb(steamId: string): Promise<UserDto[]> {
+		const friendships = await this.fetchDb(
+			this.supabase
+				.from("friendship")
+				.select("friend_id")
+				.eq("user_id", steamId),
+			"Failed to fetch friendships from database",
+		);
+
+		const friendIds = friendships.map((f) => f.friend_id);
+
+		if (friendIds.length === 0) {
+			return [];
+		}
+
+		return this.fetchDb(
+			this.supabase
+				.from("users")
+				.select("*")
+				.in("steam_id", friendIds),
+			"Failed to fetch friends details from database",
 		);
 	}
 
