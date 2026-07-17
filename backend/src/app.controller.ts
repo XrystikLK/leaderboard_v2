@@ -1,8 +1,13 @@
+/** biome-ignore-all lint/style/useImportType: <explanation> */
 import { Controller, Get, Param, Post } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
-// biome-ignore lint/style/useImportType: <explanation>
+
 import { SteamService } from "./app.service";
-import type { LeaderboardResponseDto, ResolveURLResponseDto, UserDto } from "./dto/app-responses.dto";
+import {
+	LeaderboardResponseDto,
+	ResolveURLResponseDto,
+	UserDto,
+} from "./dto/app-responses.dto";
 @Controller("steam")
 export class AppController {
 	constructor(private readonly steamService: SteamService) {}
@@ -36,7 +41,7 @@ export class AppController {
 	@Get("/leaderboard/:steamid/:appid")
 	async getLeaderboard(
 		@Param('steamid') steamid: string,
-		@Param('appid') appid: string,  
+		@Param('appid') appid: string,
 	): Promise<LeaderboardResponseDto[]> {
 		return this.steamService.getGameLeaderboard(steamid, appid);
 	}
@@ -44,9 +49,6 @@ export class AppController {
 	@Post('/load-stats/:steamid')
   async loadStats(@Param('steamid') steamid: string): Promise<UserDto[]> {
     console.log(steamid);
-    const userStats = await this.steamService.recordUserStats(steamid);
-    const gameStats = await this.steamService.recordFriendsGameStats(steamid);
-    console.log(userStats, userStats.length);
-    return userStats;
+    return this.steamService.loadUser(steamid);
   }
 }

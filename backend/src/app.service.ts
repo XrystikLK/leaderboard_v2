@@ -74,10 +74,7 @@ export class SteamService {
 		}
 
 		return this.fetchDb(
-			this.supabase
-				.from("users")
-				.select("*")
-				.in("steam_id", friendIds),
+			this.supabase.from("users").select("*").in("steam_id", friendIds),
 			"Failed to fetch friends details from database",
 		);
 	}
@@ -106,17 +103,20 @@ export class SteamService {
 		const results = await Promise.allSettled(
 			chunks.map(async (array) => {
 				const summaries = await this.getPlayerSummaries(array);
-				return summaries.response.players.map((user) => ({
-					name: user.personaname,
-					steam_id: user.steamid,
-					avatar_hash: user.avatarhash ?? null,
-				}));
+				return summaries.response.players.map((user) => {
+					const obj = {
+						name: user.personaname,
+						steam_id: user.steamid,
+						avatar_hash: user.avatarhash ?? null,
+						last_fetch_at:
+							user.steamid === id ? new Date().toISOString() : null,
+					};
+					return obj;
+				});
 			}),
 		);
 
-		const usersToUpsert = results.reduce<
-			{ name: string; steam_id: string; avatar_hash: string | null }[]
-		>((acc, result) => {
+		const usersToUpsert = results.reduce<UserDto[]>((acc, result) => {
 			if (result.status === "fulfilled") {
 				acc.push(...result.value);
 			}
@@ -130,7 +130,6 @@ export class SteamService {
 		await this.fetchDb(
 			this.supabase.from("users").upsert(usersToUpsert, {
 				onConflict: "steam_id",
-				ignoreDuplicates: true,
 			}),
 			"Database upsert failed for users",
 		);
@@ -138,6 +137,38 @@ export class SteamService {
 		await this.recordFriendships(id);
 
 		return usersToUpsert;
+	}
+
+	async loadUser(steamId: string): Promise<UserDto[]> {
+		const user = await this.fetchDb<UserDto>(
+			this.supabase
+				.from("users")
+				.select("*")
+				.eq("steam_id", steamId)
+				.maybeSingle(),
+			"Failed to fetch user for cache check",
+		);
+		const threeHoursInMs = 3 * 60 * 60 * 1000;
+		if (user && user.last_fetch_at) {
+			const lastFetched = new Date(user.last_fetch_at).getTime();
+			const isCacheValid = Date.now() - lastFetched < threeHoursInMs;
+			if (isCacheValid) {
+				console.log("Serving user stats from Cache/DB...");
+				const friends = await this.getFriendsFromDb(steamId);
+				return [user, ...friends];
+			}
+		}
+		console.log("Cache expired or empty. Fetching from Steam API...");
+		const userStats = await this.recordUserStats(steamId);
+		await this.recordFriendsGameStats(steamId);
+		await this.fetchDb(
+			this.supabase
+				.from("users")
+				.update({ last_fetch_at: new Date().toISOString() })
+				.eq("steam_id", steamId),
+			"Failed to update user last_fetch_at timestamp",
+		);
+		return userStats;
 	}
 
 	async recordFriendships(id: string) {
@@ -303,12 +334,14 @@ export class SteamService {
 		return response.response.steamid as string;
 	}
 
-async extractSteamIdentifier(url: string): Promise<['id' | 'profiles', string] | null> {
-    const regex = /steamcommunity\.com\/(id|profiles)\/([^/?#]+)/;
-    const match = url.match(regex);
-    
-    return match ? [match[1] as 'id' | 'profiles', match[2]] : null;
-}
+	async extractSteamIdentifier(
+		url: string,
+	): Promise<["id" | "profiles", string] | null> {
+		const regex = /steamcommunity\.com\/(id|profiles)\/([^/?#]+)/;
+		const match = url.match(regex);
+
+		return match ? [match[1] as "id" | "profiles", match[2]] : null;
+	}
 
 	async getUserGamesFromDB(id: string) {
 		const data = await this.fetchDb(
