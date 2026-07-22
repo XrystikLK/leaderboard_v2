@@ -13,10 +13,12 @@ type friend = Tables<"users">;
 export class UserDto implements friend {
 	name: string;
 	steam_id: string;
+	@ApiPropertyOptional()
 	avatar_hash: string | null;
 
 	@ApiPropertyOptional()
 	last_fetch_at: string | null;
+	is_public: boolean;
 }
 
 export class ResolveURLResponseDto {

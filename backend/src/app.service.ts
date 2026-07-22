@@ -88,7 +88,7 @@ export class SteamService {
 		);
 	}
 
-	async recordUserStats(id: string) {
+	async loadUserStats(id: string): Promise<Omit<UserDto, "is_public">[]> {
 		const friendsResponse = await this.getFriendList(id);
 		const friends = friendsResponse.friendslist?.friends || [];
 
@@ -116,25 +116,15 @@ export class SteamService {
 			}),
 		);
 
-		const usersToUpsert = results.reduce<UserDto[]>((acc, result) => {
-			if (result.status === "fulfilled") {
-				acc.push(...result.value);
-			}
-			return acc;
-		}, []);
-
-		if (usersToUpsert.length === 0) {
-			return [];
-		}
-
-		await this.fetchDb(
-			this.supabase.from("users").upsert(usersToUpsert, {
-				onConflict: "steam_id",
-			}),
-			"Database upsert failed for users",
+		const usersToUpsert = results.reduce<Omit<UserDto, "is_public">[]>(
+			(acc, result) => {
+				if (result.status === "fulfilled") {
+					acc.push(...result.value);
+				}
+				return acc;
+			},
+			[],
 		);
-
-		await this.recordFriendships(id);
 
 		return usersToUpsert;
 	}
@@ -159,8 +149,41 @@ export class SteamService {
 			}
 		}
 		console.log("Cache expired or empty. Fetching from Steam API...");
-		const userStats = await this.recordUserStats(steamId);
-		await this.recordFriendsGameStats(steamId);
+		const userStats = await this.loadUserStats(steamId);
+		const { userAccessibility, statsToUpsert, gamesMetadata } =
+			await this.loadFriendsGameStats(steamId);
+
+		const result: UserDto[] = userStats.map((user) => ({
+			...user,
+			is_public: userAccessibility.get(user.steam_id) ?? false,
+		}));
+
+		await this.fetchDb(
+			this.supabase.from("users").upsert(result, {
+				onConflict: "steam_id",
+			}),
+			"Database upsert failed for users",
+		);
+
+		await this.recordFriendships(steamId);
+
+		if (gamesMetadata.size > 0) {
+			await this.recordNewGames({
+				gamesData: Array.from(gamesMetadata.values()),
+			});
+		}
+
+		const chunkSize = 1000;
+		for (let i = 0; i < statsToUpsert.length; i += chunkSize) {
+			const chunk = statsToUpsert.slice(i, i + chunkSize);
+			await this.fetchDb(
+				this.supabase.from("game_stats").upsert(chunk, {
+					ignoreDuplicates: true,
+				}),
+				"Game stats upsert failed",
+			);
+		}
+
 		await this.fetchDb(
 			this.supabase
 				.from("users")
@@ -168,7 +191,8 @@ export class SteamService {
 				.eq("steam_id", steamId),
 			"Failed to update user last_fetch_at timestamp",
 		);
-		return userStats;
+
+		return result;
 	}
 
 	async recordFriendships(id: string) {
@@ -240,7 +264,18 @@ export class SteamService {
 		return toUpsert;
 	}
 
-	async recordFriendsGameStats(id: string) {
+	async loadFriendsGameStats(id: string): Promise<{
+		userAccessibility: Map<string, boolean>;
+		statsToUpsert: {
+			steam_id: string;
+			appid: number;
+			playtime_forever: number;
+		}[];
+		gamesMetadata: Map<
+			number,
+			{ id: number; name: string; icon_url: string | undefined }
+		>;
+	}> {
 		const friendsResponse = await this.getFriendList(id);
 		const friends = friendsResponse.friendslist?.friends || [];
 		const allIds = [id, ...friends.map((f) => f.steamid)];
@@ -268,50 +303,36 @@ export class SteamService {
 			number,
 			{ id: number; name: string; icon_url: string | undefined }
 		>();
-
+		const userAccessibility = new Map<string, boolean>();
 		results.forEach((result, index) => {
 			if (result.status === "fulfilled") {
 				const steamId = allIds[index];
 				const games = result.value;
 
-				games.forEach((game) => {
-					statsToUpsert.push({
-						steam_id: steamId,
-						appid: game.appid,
-						playtime_forever: game.playtime_forever,
-					});
-
-					if (game.name) {
-						gamesMetadata.set(game.appid, {
-							id: game.appid,
-							name: game.name,
-							icon_url: game.img_icon_url,
+				if (games.length === 0) {
+					userAccessibility.set(steamId, false);
+				} else {
+					userAccessibility.set(steamId, true);
+					games.forEach((game) => {
+						statsToUpsert.push({
+							steam_id: steamId,
+							appid: game.appid,
+							playtime_forever: game.playtime_forever,
 						});
-					}
-				});
+
+						if (game.name) {
+							gamesMetadata.set(game.appid, {
+								id: game.appid,
+								name: game.name,
+								icon_url: game.img_icon_url,
+							});
+						}
+					});
+				}
 			}
 		});
 
-		if (statsToUpsert.length === 0) return [];
-
-		if (gamesMetadata.size > 0) {
-			await this.recordNewGames({
-				gamesData: Array.from(gamesMetadata.values()),
-			});
-		}
-
-		const chunkSize = 1000;
-		for (let i = 0; i < statsToUpsert.length; i += chunkSize) {
-			const chunk = statsToUpsert.slice(i, i + chunkSize);
-			await this.fetchDb(
-				this.supabase.from("game_stats").upsert(chunk, {
-					ignoreDuplicates: true,
-				}),
-				"Game stats upsert failed",
-			);
-		}
-
-		return statsToUpsert;
+		return { userAccessibility, statsToUpsert, gamesMetadata };
 	}
 
 	async getUserSteamId(url: string): Promise<string> {
@@ -371,6 +392,7 @@ export class SteamService {
 	): Promise<T> {
 		const { data, error } = await request;
 		if (error) {
+			console.log(data, error);
 			throw new InternalServerErrorException(
 				`${errorMessage}: ${error.message}`,
 			);
