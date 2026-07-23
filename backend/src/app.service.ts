@@ -161,6 +161,7 @@ export class SteamService {
 		await this.fetchDb(
 			this.supabase.from("users").upsert(result, {
 				onConflict: "steam_id",
+				ignoreDuplicates: true,
 			}),
 			"Database upsert failed for users",
 		);
