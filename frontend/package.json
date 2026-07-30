@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"swagger-types": "openapi-typescript http://localhost:3001/api-json --output src/lib/api-types.d.ts",
+		"swagger-types": "openapi-typescript http://localhost:3001/api-json --output src/lib/api-types.ts",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

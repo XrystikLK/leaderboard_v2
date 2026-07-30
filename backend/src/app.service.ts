@@ -15,6 +15,10 @@ import type {
 	GetPlayerSummariesResponse,
 	ResolveVanityURLResponse,
 } from "@oddlaceguy49/steam-web-api-types/types/ISteamUser";
+import type {
+	GetPlayerAchievementsResponse,
+	GetSchemaForGameResponse,
+} from "@oddlaceguy49/steam-web-api-types/types/ISteamUserStats";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { InjectSupabaseClient } from "nestjs-supabase-js";
 import type { LeaderboardResponse } from "./common/db.types";
@@ -48,6 +52,134 @@ export class SteamService {
 		);
 	}
 
+	async getSchemaForGame(appId: string): Promise<GetSchemaForGameResponse> {
+		return this.fetchSteamApi<GetSchemaForGameResponse>(
+			"ISteamUserStats/GetSchemaForGame/v2",
+			{
+				appid: appId,
+				l: "russian",
+			},
+		);
+	}
+
+	async getPlayerAchievements(
+		appId: string,
+		steamId: string,
+	): Promise<GetPlayerAchievementsResponse> {
+		return this.fetchSteamApi<GetPlayerAchievementsResponse>(
+			"ISteamUserStats/GetPlayerAchievements/v0001",
+			{
+				appid: appId,
+				steamid: steamId,
+				l: "russian",
+			},
+		);
+	}
+
+	async recordAchievementStats(steamId: string, appId: string) {
+		await this.recordGameAchievements(appId);
+
+		const friendIds = await this.getFriendsWithGame(steamId, appId);
+
+		console.log("Friends with game:", friendIds);
+
+		if (friendIds.length === 0) {
+			return [];
+		}
+
+		const CONCURRENCY_LIMIT = 5;
+		const allStatsToUpsert: {
+			steam_id: string;
+			achiev_id: string;
+			is_achieve: boolean;
+			unlock_time: string | null;
+		}[] = [];
+
+		for (let i = 0; i < friendIds.length; i += CONCURRENCY_LIMIT) {
+			const chunk = friendIds.slice(i, i + CONCURRENCY_LIMIT);
+			const chunkResults = await Promise.allSettled(
+				chunk.map(async (friendId) => {
+					const res = await this.getPlayerAchievements(appId, friendId);
+					return {
+						steamId: friendId,
+						achievements: res.playerstats?.achievements || [],
+					};
+				}),
+			);
+
+			chunkResults.forEach((result) => {
+				if (
+					result.status === "fulfilled" &&
+					result.value.achievements.length > 0
+				) {
+					const { steamId, achievements } = result.value;
+					achievements.forEach((ach) => {
+						allStatsToUpsert.push({
+							steam_id: steamId,
+							achiev_id: ach.apiname,
+							is_achieve: ach.achieved === 1,
+							unlock_time:
+								ach.unlocktime > 0
+									? new Date(ach.unlocktime * 1000).toISOString()
+									: null,
+						});
+					});
+				}
+			});
+		}
+
+		if (allStatsToUpsert.length === 0) {
+			return [];
+		}
+
+		const chunkSize = 1000;
+		for (let i = 0; i < allStatsToUpsert.length; i += chunkSize) {
+			const chunk = allStatsToUpsert.slice(i, i + chunkSize);
+			await this.fetchDb(
+				this.supabase.from("achievements_stats").upsert(chunk, {
+					onConflict: "steam_id,achiev_id",
+				}),
+				"Database upsert failed for achievements_stats",
+			);
+		}
+
+		return allStatsToUpsert;
+	}
+
+	async recordGameAchievements(appId: string) {
+		const schema = await this.getSchemaForGame(appId);
+		const achievements = schema?.game?.availableGameStats?.achievements || [];
+
+		if (achievements.length === 0) {
+			return [];
+		}
+
+		const achievementsToUpsert = achievements.map((ach) => ({
+			appid: String(appId),
+			name: ach.name,
+			displayed_name: ach.displayName ?? null,
+			description: ach.description ?? null,
+			icon_hash: this.extractIconHash(ach.icon),
+			icon_gray_hash: this.extractIconHash(ach.icongray),
+		}));
+
+		await this.fetchDb(
+			this.supabase.from("achievements").upsert(achievementsToUpsert, {
+				onConflict: "appid,name",
+				ignoreDuplicates: true,
+			}),
+			"Database upsert failed for achievements",
+		);
+
+		return achievementsToUpsert;
+	}
+
+	private extractIconHash(url?: string): string | null {
+		if (!url) return null;
+		const filename = url.split("/").pop();
+		return filename ? filename.replace(/\.[^/.]+$/, "") : null;
+	}
+
 	async getFriendList(steamId: string) {
 		return this.fetchSteamApi<GetFriendListResponse>(
 			"ISteamUser/GetFriendList/v0001",
@@ -77,6 +209,35 @@ export class SteamService {
 			this.supabase.from("users").select("*").in("steam_id", friendIds),
 			"Failed to fetch friends details from database",
 		);
+	}
+
+	async getFriendsWithGame(steamId: string, appId: string): Promise<string[]> {
+		const friendships = await this.fetchDb(
+			this.supabase
+				.from("friendship")
+				.select("friend_id")
+				.eq("user_id", steamId),
+			"Failed to fetch friendships from database",
+		);
+
+		const friendIds = friendships.map((f) => f.friend_id);
+
+		if (friendIds.length === 0) {
+			return [];
+		}
+
+		const friendsWithGame = await this.fetchDb(
+			this.supabase
+				.from("game_stats")
+				.select("steam_id")
+				.eq("appid", appId)
+				.in("steam_id", friendIds),
+			"Failed to fetch game stats for friends",
+		);
+
+		const matchedSteamIds: string[] = friendsWithGame.map((g) => g.steam_id);
+
+		return matchedSteamIds;
 	}
 
 	async getPlayerSummaries(steamIds: string[]) {
@@ -373,7 +534,7 @@ export class SteamService {
 		return data;
 	}
 
-	async getGameLeaderboard(
+	async getHoursLeaderboard(
 		steamid: string,
 		appid: string,
 	): Promise<LeaderboardResponse> {

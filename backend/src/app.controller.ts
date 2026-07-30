@@ -38,12 +38,20 @@ export class AppController {
     return this.steamService.getPlayerSummaries(steamids);
   }
 
-	@Get("/leaderboard/:steamid/:appid")
+	@Get("/leaderboard/hours/:steamid/:appid")
 	async getLeaderboard(
 		@Param('steamid') steamid: string,
 		@Param('appid') appid: string,
 	): Promise<LeaderboardResponseDto[]> {
-		return this.steamService.getGameLeaderboard(steamid, appid);
+		return this.steamService.getHoursLeaderboard(steamid, appid);
+	}
+
+	@Post("/record-achievement-stats/:steamid/:appid")
+	async recordAchievementStats(
+		@Param('steamid') steamid: string,
+		@Param('appid') appid: string,
+	) {
+		return this.steamService.recordAchievementStats(steamid, appid);
 	}
 
 	@Post('/load-stats/:steamid')
