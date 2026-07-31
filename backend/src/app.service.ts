@@ -21,8 +21,11 @@ import type {
 } from "@oddlaceguy49/steam-web-api-types/types/ISteamUserStats";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { InjectSupabaseClient } from "nestjs-supabase-js";
-import type { LeaderboardResponse } from "./common/db.types";
-import type { UserDto } from "./dto/app-responses.dto";
+import type {
+	UserDto,
+	LeaderboardResponseDto,
+	Leaderboard,
+} from "./dto/app-responses.dto";
 @Injectable()
 export class SteamService {
 	constructor(
@@ -249,7 +252,9 @@ export class SteamService {
 		);
 	}
 
-	async loadUserStats(id: string): Promise<Omit<UserDto, "is_public">[]> {
+	async loadUserStats(
+		id: string,
+	): Promise<Omit<UserDto, "is_games_available">[]> {
 		const friendsResponse = await this.getFriendList(id);
 		const friends = friendsResponse.friendslist?.friends || [];
 
@@ -277,7 +282,7 @@ export class SteamService {
 			}),
 		);
 
-		const usersToUpsert = results.reduce<Omit<UserDto, "is_public">[]>(
+		const usersToUpsert = results.reduce<Omit<UserDto, "is_games_available">[]>(
 			(acc, result) => {
 				if (result.status === "fulfilled") {
 					acc.push(...result.value);
@@ -316,7 +321,7 @@ export class SteamService {
 
 		const result: UserDto[] = userStats.map((user) => ({
 			...user,
-			is_public: userAccessibility.get(user.steam_id) ?? false,
+			is_games_available: userAccessibility.get(user.steam_id) ?? false,
 		}));
 
 		await this.fetchDb(
@@ -537,15 +542,24 @@ export class SteamService {
 	async getHoursLeaderboard(
 		steamid: string,
 		appid: string,
-	): Promise<LeaderboardResponse> {
-		const data = await this.fetchDb(
-			this.supabase.rpc("get_leaderboard", {
-				target_steam_id: steamid,
-				target_appid: appid,
+	): Promise<LeaderboardResponseDto> {
+		const data = await this.fetchDb<Leaderboard["leaderboard"]>(
+			this.supabase.rpc("get_hours_leaderboard", {
+				p_user_id: steamid,
+				p_appid: appid,
 			}),
 			"Failed to fetch leaderboard from database",
 		);
-		return data;
+		console.log(data);
+		const gameInfo = await this.supabase
+			.from("games")
+			.select("*")
+			.eq("id", appid)
+			.maybeSingle();
+		return {
+			game_info: gameInfo.data,
+			leaderboard: data,
+		};
 	}
 
 	private async fetchDb<T>(

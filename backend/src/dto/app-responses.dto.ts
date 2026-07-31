@@ -1,12 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import type { Tables } from "../../db/database.types";
-import type { LeaderboardResponse } from "../common/db.types";
+import type { Database } from "../common/db.types";
 
-type leaderboard = LeaderboardResponse[number];
-export class LeaderboardResponseDto implements leaderboard {
-	appid: string;
-	steam_id: string;
-	playtime_forever: string;
+export type Leaderboard = {
+	leaderboard: Database["public"]["Functions"]["get_hours_leaderboard"]["Returns"];
+};
+
+export class LeaderboardResponseDto implements Leaderboard {
+	game_info: {
+		name: string;
+		appid: string;
+		icon_url: string;
+	};
+	leaderboard: {
+		name: string;
+		steam_id: string;
+		avatar_hash: string;
+		playtime: number;
+	}[];
 }
 
 type friend = Tables<"users">;
@@ -18,7 +29,7 @@ export class UserDto implements friend {
 
 	@ApiPropertyOptional()
 	last_fetch_at: string | null;
-	is_public: boolean;
+	is_games_available: boolean;
 }
 
 export class ResolveURLResponseDto {

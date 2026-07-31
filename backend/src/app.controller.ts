@@ -42,7 +42,7 @@ export class AppController {
 	async getLeaderboard(
 		@Param('steamid') steamid: string,
 		@Param('appid') appid: string,
-	): Promise<LeaderboardResponseDto[]> {
+	): Promise<LeaderboardResponseDto> {
 		return this.steamService.getHoursLeaderboard(steamid, appid);
 	}
 
