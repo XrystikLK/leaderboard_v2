@@ -550,7 +550,6 @@ export class SteamService {
 			}),
 			"Failed to fetch leaderboard from database",
 		);
-		console.log(data);
 		const gameInfo = await this.supabase
 			.from("games")
 			.select("*")
