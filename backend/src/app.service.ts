@@ -21,6 +21,7 @@ import type {
 } from "@oddlaceguy49/steam-web-api-types/types/ISteamUserStats";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { InjectSupabaseClient } from "nestjs-supabase-js";
+import { SteamApiService } from "./steam-api/steam-api.service";
 import type {
 	UserDto,
 	LeaderboardResponseDto,
@@ -29,9 +30,10 @@ import type {
 @Injectable()
 export class SteamService {
 	constructor(
-    private readonly configService: ConfigService,
-    @InjectSupabaseClient() private readonly supabase: SupabaseClient,
-  ) {}
+		private readonly configService: ConfigService,
+		private readonly steamApiService: SteamApiService,
+		@InjectSupabaseClient() private readonly supabase: SupabaseClient,
+	) {}
 
 	getHello(): string {
 		return "Hello World!";
@@ -44,40 +46,7 @@ export class SteamService {
 		);
 	}
 
-	async getOwnedGames(steamId: string) {
-		return this.fetchSteamApi<GetOwnedGamesResponse>(
-			"IPlayerService/GetOwnedGames/v0001",
-			{
-				steamid: steamId,
-				include_appinfo: "true",
-				include_played_free_games: "true",
-			},
-		);
-	}
 
-	async getSchemaForGame(appId: string): Promise<GetSchemaForGameResponse> {
-		return this.fetchSteamApi<GetSchemaForGameResponse>(
-			"ISteamUserStats/GetSchemaForGame/v2",
-			{
-				appid: appId,
-				l: "russian",
-			},
-		);
-	}
-
-	async getPlayerAchievements(
-		appId: string,
-		steamId: string,
-	): Promise<GetPlayerAchievementsResponse> {
-		return this.fetchSteamApi<GetPlayerAchievementsResponse>(
-			"ISteamUserStats/GetPlayerAchievements/v0001",
-			{
-				appid: appId,
-				steamid: steamId,
-				l: "russian",
-			},
-		);
-	}
 
 	async recordAchievementStats(steamId: string, appId: string) {
 		await this.recordGameAchievements(appId);
@@ -102,7 +71,7 @@ export class SteamService {
 			const chunk = friendIds.slice(i, i + CONCURRENCY_LIMIT);
 			const chunkResults = await Promise.allSettled(
 				chunk.map(async (friendId) => {
-					const res = await this.getPlayerAchievements(appId, friendId);
+					const res = await this.steamApiService.getPlayerAchievements(appId, friendId);
 					return {
 						steamId: friendId,
 						achievements: res.playerstats?.achievements || [],
@@ -150,7 +119,7 @@ export class SteamService {
 	}
 
 	async recordGameAchievements(appId: string) {
-		const schema = await this.getSchemaForGame(appId);
+		const schema = await this.steamApiService.getSchemaForGame(appId);
 		const achievements = schema?.game?.availableGameStats?.achievements || [];
 
 		if (achievements.length === 0) {
@@ -183,15 +152,7 @@ export class SteamService {
 		return filename ? filename.replace(/\.[^/.]+$/, "") : null;
 	}
 
-	async getFriendList(steamId: string) {
-		return this.fetchSteamApi<GetFriendListResponse>(
-			"ISteamUser/GetFriendList/v0001",
-			{
-				steamid: steamId,
-				relationship: "friend",
-			},
-		);
-	}
+
 
 	async getFriendsFromDb(steamId: string): Promise<UserDto[]> {
 		const friendships = await this.fetchDb(
@@ -243,19 +204,12 @@ export class SteamService {
 		return matchedSteamIds;
 	}
 
-	async getPlayerSummaries(steamIds: string[]) {
-		return this.fetchSteamApi<GetPlayerSummariesResponse>(
-			"ISteamUser/GetPlayerSummaries/v0002",
-			{
-				steamids: steamIds.join(","),
-			},
-		);
-	}
+
 
 	async loadUserStats(
 		id: string,
 	): Promise<Omit<UserDto, "is_games_available">[]> {
-		const friendsResponse = await this.getFriendList(id);
+		const friendsResponse = await this.steamApiService.getFriendList(id);
 		const friends = friendsResponse.friendslist?.friends || [];
 
 		const allIds = [id, ...friends.map((friend) => friend.steamid)];
@@ -268,7 +222,7 @@ export class SteamService {
 
 		const results = await Promise.allSettled(
 			chunks.map(async (array) => {
-				const summaries = await this.getPlayerSummaries(array);
+				const summaries = await this.steamApiService.getPlayerSummaries(array);
 				return summaries.response.players.map((user) => {
 					const obj = {
 						name: user.personaname,
@@ -443,7 +397,7 @@ export class SteamService {
 			{ id: number; name: string; icon_url: string | undefined }
 		>;
 	}> {
-		const friendsResponse = await this.getFriendList(id);
+		const friendsResponse = await this.steamApiService.getFriendList(id);
 		const friends = friendsResponse.friendslist?.friends || [];
 		const allIds = [id, ...friends.map((f) => f.steamid)];
 
@@ -454,7 +408,7 @@ export class SteamService {
 			const chunk = allIds.slice(i, i + CONCURRENCY_LIMIT);
 			const chunkResults = await Promise.allSettled(
 				chunk.map(async (steamId) => {
-					const response = await this.getOwnedGames(steamId);
+					const response = await this.steamApiService.getOwnedGames(steamId);
 					return response.response.games || [];
 				}),
 			);
@@ -513,11 +467,8 @@ export class SteamService {
 			return userIdentifier[1];
 		}
 
-		const response = await this.fetchSteamApi<ResolveVanityURLResponse>(
-			"ISteamUser/ResolveVanityURL/v0001",
-			{
-				vanityurl: userIdentifier[1],
-			},
+		const response = await this.steamApiService.resolveVanityUrl(
+			userIdentifier[1],
 		);
 		return response.response.steamid as string;
 	}
@@ -573,38 +524,5 @@ export class SteamService {
 			);
 		}
 		return data as T;
-	}
-
-	private async fetchSteamApi<T = any>(
-		path: string,
-		params: Record<string, string> = {},
-	): Promise<T> {
-		const key = this.configService.get<string>("STEAM");
-		if (!key) {
-			throw new InternalServerErrorException(
-				"Steam API key not set in environment",
-			);
-		}
-
-		const cleanPath = path.replace(/^\/|\/$/g, "");
-		const url = new URL(`https://api.steampowered.com/${cleanPath}/`);
-
-		url.searchParams.append("key", key);
-		url.searchParams.append("format", "json");
-		for (const [k, v] of Object.entries(params)) {
-			url.searchParams.append(k, v);
-		}
-
-		console.log("REQUEST URL:", url.href);
-		const response = await fetch(url);
-		if (!response.ok) {
-			const errorText = await response.text();
-			throw new HttpException(
-				`Failed to fetch from Steam API: ${response.statusText} - ${errorText}`,
-				response.status,
-			);
-		}
-
-		return response.json() as Promise<T>;
 	}
 }

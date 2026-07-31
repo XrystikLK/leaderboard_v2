@@ -1,0 +1,143 @@
+import {
+	HttpException,
+	Injectable,
+	InternalServerErrorException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { GetOwnedGamesResponse } from "@oddlaceguy49/steam-web-api-types/types/IPlayerService";
+import type {
+	GetFriendListResponse,
+	GetPlayerSummariesResponse,
+	ResolveVanityURLResponse,
+} from "@oddlaceguy49/steam-web-api-types/types/ISteamUser";
+import type {
+	GetPlayerAchievementsResponse,
+	GetSchemaForGameResponse,
+} from "@oddlaceguy49/steam-web-api-types/types/ISteamUserStats";
+
+/**
+ * Low-level client service for executing requests to the Steam Web API.
+ */
+@Injectable()
+export class SteamApiService {
+	constructor(private readonly configService: ConfigService) {}
+
+	/**
+	 * Generic fetch method for calling Steam Web API endpoints.
+	 */
+	private async fetchSteamApi<T = any>(
+		path: string,
+		params: Record<string, string> = {},
+	): Promise<T> {
+		const key = this.configService.get<string>("STEAM");
+		if (!key) {
+			throw new InternalServerErrorException(
+				"Steam API key not set in environment",
+			);
+		}
+
+		const cleanPath = path.replace(/^\/|\/$/g, "");
+		const url = new URL(`https://api.steampowered.com/${cleanPath}/`);
+
+		url.searchParams.append("key", key);
+		url.searchParams.append("format", "json");
+		for (const [k, v] of Object.entries(params)) {
+			url.searchParams.append(k, v);
+		}
+
+		console.log("REQUEST URL:", url.href);
+		const response = await fetch(url);
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new HttpException(
+				`Failed to fetch from Steam API: ${response.statusText} - ${errorText}`,
+				response.status,
+			);
+		}
+
+		return response.json() as Promise<T>;
+	}
+
+	/**
+	 * Fetches owned games for a specific Steam user.
+	 */
+	async getOwnedGames(steamId: string): Promise<GetOwnedGamesResponse> {
+		return this.fetchSteamApi<GetOwnedGamesResponse>(
+			"IPlayerService/GetOwnedGames/v0001",
+			{
+				steamid: steamId,
+				include_appinfo: "true",
+				include_played_free_games: "true",
+			},
+		);
+	}
+
+	/**
+	 * Fetches schema (achievements list) for a game.
+	 */
+	async getSchemaForGame(appId: string): Promise<GetSchemaForGameResponse> {
+		return this.fetchSteamApi<GetSchemaForGameResponse>(
+			"ISteamUserStats/GetSchemaForGame/v2",
+			{
+				appid: appId,
+				l: "russian",
+			},
+		);
+	}
+
+	/**
+	 * Fetches achievements unlocked by a player for a specific game.
+	 */
+	async getPlayerAchievements(
+		appId: string,
+		steamId: string,
+	): Promise<GetPlayerAchievementsResponse> {
+		return this.fetchSteamApi<GetPlayerAchievementsResponse>(
+			"ISteamUserStats/GetPlayerAchievements/v0001",
+			{
+				appid: appId,
+				steamid: steamId,
+				l: "russian",
+			},
+		);
+	}
+
+	/**
+	 * Fetches the list of friends for a Steam user.
+	 */
+	async getFriendList(steamId: string): Promise<GetFriendListResponse> {
+		return this.fetchSteamApi<GetFriendListResponse>(
+			"ISteamUser/GetFriendList/v0001",
+			{
+				steamid: steamId,
+				relationship: "friend",
+			},
+		);
+	}
+
+	/**
+	 * Fetches player summaries (profile details) for multiple Steam IDs.
+	 */
+	async getPlayerSummaries(
+		steamIds: string[],
+	): Promise<GetPlayerSummariesResponse> {
+		return this.fetchSteamApi<GetPlayerSummariesResponse>(
+			"ISteamUser/GetPlayerSummaries/v0002",
+			{
+				steamids: steamIds.join(","),
+			},
+		);
+	}
+
+	/**
+	 * Resolves a custom Steam vanity URL to a 64-bit Steam ID.
+	 */
+	async resolveVanityUrl(vanityUrl: string): Promise<ResolveVanityURLResponse> {
+		return this.fetchSteamApi<ResolveVanityURLResponse>(
+			"ISteamUser/ResolveVanityURL/v0001",
+			{
+				vanityurl: vanityUrl,
+			},
+		);
+	}
+}

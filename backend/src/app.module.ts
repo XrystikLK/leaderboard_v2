@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { AppController } from "./app.controller";
 import { SteamService } from "./app.service";
 import { SupabaseModule } from "nestjs-supabase-js";
+import { SteamApiModule } from "./steam-api/steam-api.module";
 
 @Module({
 	imports: [
@@ -18,6 +19,7 @@ import { SupabaseModule } from "nestjs-supabase-js";
 			}),
 		}),
 		SupabaseModule.injectClient(),
+		SteamApiModule,
 	],
 	controllers: [AppController],
 	providers: [SteamService],

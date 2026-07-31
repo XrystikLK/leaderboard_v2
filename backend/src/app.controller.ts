@@ -3,6 +3,7 @@ import { Controller, Get, Param, Post } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 
 import { SteamService } from "./app.service";
+import { SteamApiService } from "./steam-api/steam-api.service";
 import {
 	LeaderboardResponseDto,
 	ResolveURLResponseDto,
@@ -10,7 +11,10 @@ import {
 } from "./dto/app-responses.dto";
 @Controller("steam")
 export class AppController {
-	constructor(private readonly steamService: SteamService) {}
+	constructor(
+		private readonly steamService: SteamService,
+		private readonly steamApiService: SteamApiService,
+	) {}
 
 	@Get('/resolveURL/:url')
   async test(@Param('url') id: string): Promise<ResolveURLResponseDto> {
@@ -25,7 +29,7 @@ export class AppController {
 
 	@Get('/games/:steamid')
   async getOwnedGames(@Param('steamid') id: string) {
-    return this.steamService.getOwnedGames(id);
+    return this.steamApiService.getOwnedGames(id);
   }
 
 	@Get('/friends/:steamid')
@@ -35,7 +39,7 @@ export class AppController {
 
 	@Get('/summaries/:steamids')
   async getSummaries(@Param('steamids') steamids: string[]) {
-    return this.steamService.getPlayerSummaries(steamids);
+    return this.steamApiService.getPlayerSummaries(steamids);
   }
 
 	@Get("/leaderboard/hours/:steamid/:appid")
