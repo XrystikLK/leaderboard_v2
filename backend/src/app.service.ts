@@ -46,8 +46,6 @@ export class SteamService {
 		);
 	}
 
-
-
 	async recordAchievementStats(steamId: string, appId: string) {
 		await this.recordGameAchievements(appId);
 
@@ -71,7 +69,10 @@ export class SteamService {
 			const chunk = friendIds.slice(i, i + CONCURRENCY_LIMIT);
 			const chunkResults = await Promise.allSettled(
 				chunk.map(async (friendId) => {
-					const res = await this.steamApiService.getPlayerAchievements(appId, friendId);
+					const res = await this.steamApiService.getPlayerAchievements(
+						appId,
+						friendId,
+					);
 					return {
 						steamId: friendId,
 						achievements: res.playerstats?.achievements || [],
@@ -152,8 +153,6 @@ export class SteamService {
 		return filename ? filename.replace(/\.[^/.]+$/, "") : null;
 	}
 
-
-
 	async getFriendsFromDb(steamId: string): Promise<UserDto[]> {
 		const friendships = await this.fetchDb(
 			this.supabase
@@ -203,8 +202,6 @@ export class SteamService {
 
 		return matchedSteamIds;
 	}
-
-
 
 	async loadUserStats(
 		id: string,
@@ -317,7 +314,7 @@ export class SteamService {
 	}
 
 	async recordFriendships(id: string) {
-		const friendsResponse = await this.getFriendList(id);
+		const friendsResponse = await this.steamApiService.getFriendList(id);
 		const friends = friendsResponse.friendslist?.friends || [];
 
 		if (friends.length === 0) {
@@ -357,7 +354,9 @@ export class SteamService {
 		if (params.gamesData) {
 			toUpsert = params.gamesData;
 		} else if (params.steam_id) {
-			const response = await this.getOwnedGames(params.steam_id);
+			const response = await this.steamApiService.getOwnedGames(
+				params.steam_id,
+			);
 			const games = response.response.games || [];
 
 			if (games.length === 0) {

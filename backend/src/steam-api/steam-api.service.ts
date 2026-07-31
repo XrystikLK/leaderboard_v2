@@ -15,16 +15,10 @@ import type {
 	GetSchemaForGameResponse,
 } from "@oddlaceguy49/steam-web-api-types/types/ISteamUserStats";
 
-/**
- * Low-level client service for executing requests to the Steam Web API.
- */
 @Injectable()
 export class SteamApiService {
 	constructor(private readonly configService: ConfigService) {}
 
-	/**
-	 * Generic fetch method for calling Steam Web API endpoints.
-	 */
 	private async fetchSteamApi<T = any>(
 		path: string,
 		params: Record<string, string> = {},
@@ -58,9 +52,6 @@ export class SteamApiService {
 		return response.json() as Promise<T>;
 	}
 
-	/**
-	 * Fetches owned games for a specific Steam user.
-	 */
 	async getOwnedGames(steamId: string): Promise<GetOwnedGamesResponse> {
 		return this.fetchSteamApi<GetOwnedGamesResponse>(
 			"IPlayerService/GetOwnedGames/v0001",
@@ -72,9 +63,6 @@ export class SteamApiService {
 		);
 	}
 
-	/**
-	 * Fetches schema (achievements list) for a game.
-	 */
 	async getSchemaForGame(appId: string): Promise<GetSchemaForGameResponse> {
 		return this.fetchSteamApi<GetSchemaForGameResponse>(
 			"ISteamUserStats/GetSchemaForGame/v2",
@@ -85,9 +73,6 @@ export class SteamApiService {
 		);
 	}
 
-	/**
-	 * Fetches achievements unlocked by a player for a specific game.
-	 */
 	async getPlayerAchievements(
 		appId: string,
 		steamId: string,
@@ -102,9 +87,6 @@ export class SteamApiService {
 		);
 	}
 
-	/**
-	 * Fetches the list of friends for a Steam user.
-	 */
 	async getFriendList(steamId: string): Promise<GetFriendListResponse> {
 		return this.fetchSteamApi<GetFriendListResponse>(
 			"ISteamUser/GetFriendList/v0001",
@@ -115,9 +97,6 @@ export class SteamApiService {
 		);
 	}
 
-	/**
-	 * Fetches player summaries (profile details) for multiple Steam IDs.
-	 */
 	async getPlayerSummaries(
 		steamIds: string[],
 	): Promise<GetPlayerSummariesResponse> {
@@ -129,9 +108,6 @@ export class SteamApiService {
 		);
 	}
 
-	/**
-	 * Resolves a custom Steam vanity URL to a 64-bit Steam ID.
-	 */
 	async resolveVanityUrl(vanityUrl: string): Promise<ResolveVanityURLResponse> {
 		return this.fetchSteamApi<ResolveVanityURLResponse>(
 			"ISteamUser/ResolveVanityURL/v0001",
