@@ -20,6 +20,8 @@ export class LeaderboardResponseDto implements Leaderboard {
 	}[];
 }
 
+export type GameAccessibility = "public" | "private" | "error";
+
 type friend = Tables<"users">;
 export class UserDto implements friend {
 	name: string;
@@ -29,7 +31,9 @@ export class UserDto implements friend {
 
 	@ApiPropertyOptional()
 	last_fetch_at: string | null;
-	is_games_available: boolean;
+
+	@ApiPropertyOptional({ enum: ["public", "private", "error"] })
+	game_accessibility: GameAccessibility;
 }
 
 export class ResolveURLResponseDto {

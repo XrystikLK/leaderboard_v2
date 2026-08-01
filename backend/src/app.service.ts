@@ -21,12 +21,13 @@ import type {
 } from "@oddlaceguy49/steam-web-api-types/types/ISteamUserStats";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { InjectSupabaseClient } from "nestjs-supabase-js";
-import { SteamApiService } from "./steam-api/steam-api.service";
 import type {
-	UserDto,
-	LeaderboardResponseDto,
+	GameAccessibility,
 	Leaderboard,
+	LeaderboardResponseDto,
+	UserDto,
 } from "./dto/app-responses.dto";
+import { SteamApiService } from "./steam-api/steam-api.service";
 @Injectable()
 export class SteamService {
 	constructor(
@@ -205,7 +206,7 @@ export class SteamService {
 
 	async loadUserStats(
 		id: string,
-	): Promise<Omit<UserDto, "is_games_available">[]> {
+	): Promise<Omit<UserDto, "game_accessibility">[]> {
 		const friendsResponse = await this.steamApiService.getFriendList(id);
 		const friends = friendsResponse.friendslist?.friends || [];
 
@@ -233,7 +234,7 @@ export class SteamService {
 			}),
 		);
 
-		const usersToUpsert = results.reduce<Omit<UserDto, "is_games_available">[]>(
+		const usersToUpsert = results.reduce<Omit<UserDto, "game_accessibility">[]>(
 			(acc, result) => {
 				if (result.status === "fulfilled") {
 					acc.push(...result.value);
@@ -247,24 +248,24 @@ export class SteamService {
 	}
 
 	async loadUser(steamId: string): Promise<UserDto[]> {
-		const user = await this.fetchDb<UserDto>(
-			this.supabase
-				.from("users")
-				.select("*")
-				.eq("steam_id", steamId)
-				.maybeSingle(),
-			"Failed to fetch user for cache check",
-		);
-		const threeHoursInMs = 3 * 60 * 60 * 1000;
-		if (user && user.last_fetch_at) {
-			const lastFetched = new Date(user.last_fetch_at).getTime();
-			const isCacheValid = Date.now() - lastFetched < threeHoursInMs;
-			if (isCacheValid) {
-				console.log("Serving user stats from Cache/DB...");
-				const friends = await this.getFriendsFromDb(steamId);
-				return [user, ...friends];
-			}
-		}
+		// const user = await this.fetchDb<UserDto>(
+		// 	this.supabase
+		// 		.from("users")
+		// 		.select("*")
+		// 		.eq("steam_id", steamId)
+		// 		.maybeSingle(),
+		// 	"Failed to fetch user for cache check",
+		// );
+		// const threeHoursInMs = 3 * 60 * 60 * 1000;
+		// if (user && user.last_fetch_at) {
+		// 	const lastFetched = new Date(user.last_fetch_at).getTime();
+		// 	const isCacheValid = Date.now() - lastFetched < threeHoursInMs;
+		// 	if (isCacheValid) {
+		// 		console.log("Serving user stats from Cache/DB...");
+		// 		const friends = await this.getFriendsFromDb(steamId);
+		// 		return [user, ...friends];
+		// 	}
+		// }
 		console.log("Cache expired or empty. Fetching from Steam API...");
 		const userStats = await this.loadUserStats(steamId);
 		const { userAccessibility, statsToUpsert, gamesMetadata } =
@@ -272,7 +273,10 @@ export class SteamService {
 
 		const result: UserDto[] = userStats.map((user) => ({
 			...user,
-			is_games_available: userAccessibility.get(user.steam_id) ?? false,
+			game_accessibility:
+				(userAccessibility.get(user.steam_id) ?? "error")
+					? "public"
+					: "private",
 		}));
 
 		await this.fetchDb(
@@ -400,14 +404,18 @@ export class SteamService {
 		const friends = friendsResponse.friendslist?.friends || [];
 		const allIds = [id, ...friends.map((f) => f.steamid)];
 
-		const CONCURRENCY_LIMIT = 5;
+		const CONCURRENCY_LIMIT = 6;
 		const results: PromiseSettledResult<OwnedGame[]>[] = [];
 
 		for (let i = 0; i < allIds.length; i += CONCURRENCY_LIMIT) {
 			const chunk = allIds.slice(i, i + CONCURRENCY_LIMIT);
 			const chunkResults = await Promise.allSettled(
 				chunk.map(async (steamId) => {
-					const response = await this.steamApiService.getOwnedGames(steamId);
+					const response = await this.fetchWithRetry(
+						() => this.steamApiService.getOwnedGames(steamId),
+						3,
+						1000,
+					);
 					return response.response.games || [];
 				}),
 			);
@@ -483,10 +491,10 @@ export class SteamService {
 
 	async getUserGamesFromDB(id: string) {
 		const data = await this.fetchDb(
-			this.supabase.from("game_stats").select().eq("steam_id", id),
+			this.supabase.from("game_stats").select(`games (*)`).eq("steam_id", id),
 			"Failed to fetch user games from database",
 		);
-		return data;
+		return data.map((game) => game.games);
 	}
 
 	async getHoursLeaderboard(
@@ -523,5 +531,27 @@ export class SteamService {
 			);
 		}
 		return data as T;
+	}
+
+	private async fetchWithRetry<T>(
+		fn: () => Promise<T>,
+		retries: number = 3,
+		delayMs: number = 1000,
+	): Promise<T> {
+		let lastError: unknown;
+
+		for (let attempt = 1; attempt <= retries; attempt++) {
+			try {
+				return await fn();
+			} catch (error) {
+				console.log("Ошибка запроса, осталось попыток", retries - attempt);
+				lastError = error;
+				if (attempt < retries && delayMs > 0) {
+					await new Promise((resolve) => setTimeout(resolve, delayMs));
+				}
+			}
+		}
+
+		throw lastError;
 	}
 }
