@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+	ApiExtraModels,
+	ApiProperty,
+	ApiPropertyOptional,
+	getSchemaPath,
+} from "@nestjs/swagger";
 import type { Database, Tables } from "../common/db.types";
 
 export type Leaderboard = {
@@ -44,10 +49,9 @@ export class ResolveURLResponseDto {
 	steam_id: string;
 }
 
-export class AchievementDto implements Omit<Tables<"achievements">, "appid"> {
-	@ApiProperty()
-	name: string;
-
+export class AchievementDto
+	implements Omit<Tables<"achievements">, "appid" | "name">
+{
 	@ApiPropertyOptional()
 	displayed_name: string | null;
 
@@ -61,24 +65,34 @@ export class AchievementDto implements Omit<Tables<"achievements">, "appid"> {
 	icon_gray_hash: string | null;
 }
 
-export class AchievementUserStatDto
-	extends UserDto
-	implements Omit<Tables<"achievements_stats">, "appid" | "steam_id">
-{
+export class AchievementLeaderboardUserDto {
 	@ApiProperty()
-	achiev_id: string;
+	steam_id: string;
 
 	@ApiProperty()
-	is_achieve: boolean;
+	name: string;
 
 	@ApiPropertyOptional()
-	unlock_time: string | null;
+	avatar_hash: string | null;
+
+	@ApiProperty()
+	unlocked_count: number;
+
+	@ApiProperty({
+		type: "object",
+		additionalProperties: { type: "string" },
+	})
+	user_achievements: Record<string, string>;
 }
 
+@ApiExtraModels(AchievementDto)
 export class AchievementsLeaderboard {
-	@ApiProperty({ type: [AchievementDto] })
-	achievements: AchievementDto[];
+	@ApiProperty({
+		type: "object",
+		additionalProperties: { $ref: getSchemaPath(AchievementDto) },
+	})
+	achievements: Record<string, AchievementDto>;
 
-	@ApiProperty({ type: [AchievementUserStatDto] })
-	leaderboard: AchievementUserStatDto[];
+	@ApiProperty({ type: [AchievementLeaderboardUserDto] })
+	leaderboard: AchievementLeaderboardUserDto[];
 }

@@ -20,9 +20,9 @@ export class AppController {
 	@Get('/test/:url')
   async test(@Param('url') id: string) {
 
-    const steam_id = await this.steamService.testFunc();
+    const steam_id = await this.steamService.getAchievementsLeaderboard("76561198825682828", "3527290");
     console.log(steam_id);
-    return steam_id
+    return {leaderboard: steam_id}
   }
 
 	@Get('/games/:steamid')

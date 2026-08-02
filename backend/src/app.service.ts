@@ -23,6 +23,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { InjectSupabaseClient } from "nestjs-supabase-js";
 import type { Tables } from "./common/db.types";
 import type {
+	AchievementDto,
 	AchievementsLeaderboard,
 	GameAccessibility,
 	Leaderboard,
@@ -535,7 +536,9 @@ export class SteamService {
 		steamId: string,
 		appId: string,
 	): Promise<AchievementsLeaderboard> {
-		const achievements = await this.fetchDb<  
+		await this.recordAchievementStats(steamId, appId);
+
+		const achievementsData = await this.fetchDb<
 			Omit<Tables<"achievements">, "appid">[]
 		>(
 			this.supabase
@@ -544,6 +547,12 @@ export class SteamService {
 				.eq("appid", appId),
 			"Failed to fetch achievements from database",
 		);
+
+		const achievements: Record<string, AchievementDto> = {};
+		for (const item of achievementsData) {
+			const { name, ...rest } = item;
+			achievements[name] = rest;
+		}
 
 		const friendships = await this.fetchDb(
 			this.supabase
@@ -556,38 +565,13 @@ export class SteamService {
 		const friendIds = friendships.map((f) => f.friend_id);
 		const allSteamIds = [steamId, ...friendIds];
 
-		const statsData = await this.fetchDb<
-			{
-				achiev_id: string;
-				is_achieve: boolean;
-				unlock_time: string | null;
-				users: any;
-			}[]
-		>(
-			this.supabase
-				.from("achievements_stats")
-				.select(`
-					achiev_id,
-					is_achieve,
-					unlock_time,
-					users!inner (
-						*
-					)
-				`)
-				.eq("appid", appId)
-				.in("steam_id", allSteamIds),
-			"Failed to fetch achievements stats from database",
+		const leaderboard = await this.fetchDb(
+			this.supabase.rpc("get_achievements_leaderboard", {
+				p_appid: appId,
+				p_steam_ids: allSteamIds,
+			}),
+			"Failed to fetch rpc achievements leaderboard from database",
 		);
-
-		const leaderboard = statsData.map((item) => {
-			const { users, achiev_id, is_achieve, unlock_time } = item;
-			return {
-				...users,
-				achiev_id,
-				is_achieve,
-				unlock_time,
-			};
-		});
 		return {
 			achievements,
 			leaderboard,
