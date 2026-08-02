@@ -21,7 +21,9 @@ import type {
 } from "@oddlaceguy49/steam-web-api-types/types/ISteamUserStats";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { InjectSupabaseClient } from "nestjs-supabase-js";
+import type { Tables } from "./common/db.types";
 import type {
+	AchievementsLeaderboard,
 	GameAccessibility,
 	Leaderboard,
 	LeaderboardResponseDto,
@@ -64,6 +66,7 @@ export class SteamService {
 			achiev_id: string;
 			is_achieve: boolean;
 			unlock_time: string | null;
+			appid: string;
 		}[] = [];
 
 		for (let i = 0; i < friendIds.length; i += CONCURRENCY_LIMIT) {
@@ -96,6 +99,7 @@ export class SteamService {
 								ach.unlocktime > 0
 									? new Date(ach.unlocktime * 1000).toISOString()
 									: null,
+							appid: appId,
 						});
 					});
 				}
@@ -248,24 +252,24 @@ export class SteamService {
 	}
 
 	async loadUser(steamId: string): Promise<UserDto[]> {
-		// const user = await this.fetchDb<UserDto>(
-		// 	this.supabase
-		// 		.from("users")
-		// 		.select("*")
-		// 		.eq("steam_id", steamId)
-		// 		.maybeSingle(),
-		// 	"Failed to fetch user for cache check",
-		// );
-		// const threeHoursInMs = 3 * 60 * 60 * 1000;
-		// if (user && user.last_fetch_at) {
-		// 	const lastFetched = new Date(user.last_fetch_at).getTime();
-		// 	const isCacheValid = Date.now() - lastFetched < threeHoursInMs;
-		// 	if (isCacheValid) {
-		// 		console.log("Serving user stats from Cache/DB...");
-		// 		const friends = await this.getFriendsFromDb(steamId);
-		// 		return [user, ...friends];
-		// 	}
-		// }
+		const user = await this.fetchDb<UserDto>(
+			this.supabase
+				.from("users")
+				.select("*")
+				.eq("steam_id", steamId)
+				.maybeSingle(),
+			"Failed to fetch user for cache check",
+		);
+		const threeHoursInMs = 3 * 60 * 60 * 1000;
+		if (user && user.last_fetch_at) {
+			const lastFetched = new Date(user.last_fetch_at).getTime();
+			const isCacheValid = Date.now() - lastFetched < threeHoursInMs;
+			if (isCacheValid) {
+				console.log("Serving user stats from Cache/DB...");
+				const friends = await this.getFriendsFromDb(steamId);
+				return [user, ...friends];
+			}
+		}
 		console.log("Cache expired or empty. Fetching from Steam API...");
 		const userStats = await this.loadUserStats(steamId);
 		const { userAccessibility, statsToUpsert, gamesMetadata } =
@@ -463,6 +467,14 @@ export class SteamService {
 		return { userAccessibility, statsToUpsert, gamesMetadata };
 	}
 
+	async testFunc() {
+		return await this.supabase.from("achievements_stats").select(`
+			users (*),
+			achievements!achievements_stats_achiev_id_appid_fkey (*),
+			*
+			 `);
+	}
+
 	async getUserSteamId(url: string): Promise<string> {
 		console.log("url:", url);
 		const userIdentifier = await this.extractSteamIdentifier(url);
@@ -516,6 +528,69 @@ export class SteamService {
 		return {
 			game_info: gameInfo.data,
 			leaderboard: data,
+		};
+	}
+
+	async getAchievementsLeaderboard(
+		steamId: string,
+		appId: string,
+	): Promise<AchievementsLeaderboard> {
+		const achievements = await this.fetchDb<  
+			Omit<Tables<"achievements">, "appid">[]
+		>(
+			this.supabase
+				.from("achievements")
+				.select("name, displayed_name, description, icon_hash, icon_gray_hash")
+				.eq("appid", appId),
+			"Failed to fetch achievements from database",
+		);
+
+		const friendships = await this.fetchDb(
+			this.supabase
+				.from("friendship")
+				.select("friend_id")
+				.eq("user_id", steamId),
+			"Failed to fetch friendships from database",
+		);
+
+		const friendIds = friendships.map((f) => f.friend_id);
+		const allSteamIds = [steamId, ...friendIds];
+
+		const statsData = await this.fetchDb<
+			{
+				achiev_id: string;
+				is_achieve: boolean;
+				unlock_time: string | null;
+				users: any;
+			}[]
+		>(
+			this.supabase
+				.from("achievements_stats")
+				.select(`
+					achiev_id,
+					is_achieve,
+					unlock_time,
+					users!inner (
+						*
+					)
+				`)
+				.eq("appid", appId)
+				.in("steam_id", allSteamIds),
+			"Failed to fetch achievements stats from database",
+		);
+
+		const leaderboard = statsData.map((item) => {
+			const { users, achiev_id, is_achieve, unlock_time } = item;
+			return {
+				...users,
+				achiev_id,
+				is_achieve,
+				unlock_time,
+			};
+		});
+		return {
+			achievements,
+			leaderboard,
 		};
 	}
 

@@ -3,12 +3,13 @@ import { Controller, Get, Param, Post } from "@nestjs/common";
 import { ApiOkResponse } from "@nestjs/swagger";
 
 import { SteamService } from "./app.service";
-import { SteamApiService } from "./steam-api/steam-api.service";
 import {
+	AchievementsLeaderboard,
 	LeaderboardResponseDto,
 	ResolveURLResponseDto,
 	UserDto,
 } from "./dto/app-responses.dto";
+import { SteamApiService } from "./steam-api/steam-api.service";
 @Controller("steam")
 export class AppController {
 	constructor(
@@ -16,20 +17,17 @@ export class AppController {
 		private readonly steamApiService: SteamApiService,
 	) {}
 
-	@Get('/resolveURL/:url')
-  async test(@Param('url') id: string): Promise<ResolveURLResponseDto> {
+	@Get('/test/:url')
+  async test(@Param('url') id: string) {
 
-    const steam_id = await this.steamService.getUserSteamId(id);
+    const steam_id = await this.steamService.testFunc();
     console.log(steam_id);
-    // return {
-    //   message: `Steam user ${test} processed.`,
-    // }; 
-    return { steam_id }
+    return steam_id
   }
 
 	@Get('/games/:steamid')
   async getOwnedGames(@Param('steamid') id: string) {
-    return this.steamApiService.getOwnedGames(id);
+    return this.steamService.getUserGamesFromDB(id);
   }
 
 	@Get('/friends/:steamid')
@@ -48,6 +46,15 @@ export class AppController {
 		@Param('appid') appid: string,
 	): Promise<LeaderboardResponseDto> {
 		return this.steamService.getHoursLeaderboard(steamid, appid);
+	}
+
+	@ApiOkResponse({ type: AchievementsLeaderboard })
+	@Get("/leaderboard/achievements/:steamid/:appid")
+	async getAchievementsLeaderboard(
+		@Param("steamid") steamid: string,
+		@Param("appid") appid: string,
+	): Promise<AchievementsLeaderboard> {
+		return this.steamService.getAchievementsLeaderboard(steamid, appid);
 	}
 
 	@Post("/record-achievement-stats/:steamid/:appid")

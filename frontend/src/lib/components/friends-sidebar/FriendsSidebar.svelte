@@ -1,17 +1,17 @@
 <script lang="ts">
-import { page } from "$app/state";
-import { client } from "$lib/api-fetch";
-import { createQuery } from "@tanstack/svelte-query";
-import * as Sidebar from "$lib/components/ui/sidebar";
-import { Skeleton } from "$lib/components/ui/skeleton";
 import {
+	Check,
+	Copy,
+	ExternalLink,
 	Gamepad2,
 	Lock,
-	Copy,
-	Check,
-	ExternalLink,
 	Users,
 } from "@lucide/svelte";
+import { createQuery } from "@tanstack/svelte-query";
+import { page } from "$app/state";
+import { client } from "$lib/api-fetch";
+import * as Sidebar from "$lib/components/ui/sidebar";
+import { Skeleton } from "$lib/components/ui/skeleton";
 
 const userFriends = createQuery(() => ({
 	queryKey: ["user-friends", page.params.steamid],
@@ -108,13 +108,13 @@ async function copyToClipboard(id: string) {
 													: "https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg"}
 												alt={friend.name}
 												onerror={(e) => ((e.currentTarget as HTMLImageElement).src = "https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb_full.jpg")}
-												class="size-10 rounded-lg object-cover ring-2 transition-transform duration-200 group-hover/friend:scale-105 {friend.is_games_available ? 'ring-emerald-500/60' : 'ring-slate-700/60'}"
+												class="size-10 rounded-lg object-cover ring-2 transition-transform duration-200 group-hover/friend:scale-105 {friend.game_accessibility === 'public' ? 'ring-emerald-500/60' : friend.game_accessibility === 'error' ? 'ring-amber-500/60' : 'ring-slate-700/60'}"
 											>
 											<span
-												class="absolute -bottom-1 -right-1 size-3.5 rounded-full border-2 border-background flex items-center justify-center {friend.is_games_available ? 'bg-emerald-500 text-slate-950' : 'bg-slate-700 text-slate-400'}"
-												title={friend.is_games_available ? "Игры доступны" : "Приватный доступ"}
+												class="absolute -bottom-1 -right-1 size-3.5 rounded-full border-2 border-background flex items-center justify-center {friend.game_accessibility === 'public' ? 'bg-emerald-500 text-slate-950' : friend.game_accessibility === 'error' ? 'bg-amber-500 text-slate-950' : 'bg-slate-700 text-slate-400'}"
+												title={friend.game_accessibility === 'public' ? "Игры доступны" : friend.game_accessibility === 'error' ? "Ошибка получения данных" : "Приватный доступ"}
 											>
-												{#if !friend.is_games_available}
+												{#if friend.game_accessibility !== "public"}
 													<Lock class="size-2" />
 												{/if}
 											</span>
@@ -152,13 +152,21 @@ async function copyToClipboard(id: string) {
 									</div>
 
 									<div class="flex flex-col items-end gap-1 shrink-0">
-										{#if friend.is_games_available}
+										{#if friend.game_accessibility === "public"}
 											<p
 												class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
 											>
 												<Gamepad2 class="size-3" />
 												<span>Игры</span>
 											</p>
+										{:else if friend.game_accessibility === "error"}
+											<span
+												class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20"
+												title="Ошибка получения данных"
+											>
+												<Lock class="size-3" />
+												<span>Ошибка</span>
+											</span>
 										{:else}
 											<span
 												class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-border"

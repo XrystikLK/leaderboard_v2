@@ -10,6 +10,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "db": "npx supabase start",
+    "db_types": " npx supabase gen types typescript --project-id \"yotqiqjdosqqpmxurkgl\" --schema public > ./src/common/db.types.ts",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",

@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { SupabaseModule } from "nestjs-supabase-js";
 import { AppController } from "./app.controller";
 import { SteamService } from "./app.service";
-import { SupabaseModule } from "nestjs-supabase-js";
 import { SteamApiModule } from "./steam-api/steam-api.module";
 
 @Module({

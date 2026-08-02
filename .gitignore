@@ -6,6 +6,7 @@ Thumbs.db
 .env.*
 !.env.example
 !.env.test
+skills-lock.json
 
 # --- Backend (NestJS) ---
 backend/dist/
@@ -16,6 +17,7 @@ backend/.nyc_output/
 backend/report.[0-9]*.json
 backend/db/supabase/snippets/
 backend/db/database.types.ts
+backend/supabase
 
 # --- Frontend (Svelte/Vite) ---
 frontend/.output/
