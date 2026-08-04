@@ -61,6 +61,8 @@ export class SteamService {
 			return [];
 		}
 
+		const allIds = [steamId, ...friendIds];
+
 		const CONCURRENCY_LIMIT = 5;
 		const allStatsToUpsert: {
 			steam_id: string;
@@ -70,8 +72,8 @@ export class SteamService {
 			appid: string;
 		}[] = [];
 
-		for (let i = 0; i < friendIds.length; i += CONCURRENCY_LIMIT) {
-			const chunk = friendIds.slice(i, i + CONCURRENCY_LIMIT);
+		for (let i = 0; i < allIds.length; i += CONCURRENCY_LIMIT) {
+			const chunk = allIds.slice(i, i + CONCURRENCY_LIMIT);
 			const chunkResults = await Promise.allSettled(
 				chunk.map(async (friendId) => {
 					const res = await this.steamApiService.getPlayerAchievements(
