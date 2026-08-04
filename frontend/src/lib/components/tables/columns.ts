@@ -1,18 +1,24 @@
 import type { ColumnDef } from "@tanstack/table-core";
-import type { components } from "$lib/api-types";
+import { renderComponent } from "$lib/components/ui/data-table/index.js";
+import { UserCard } from "$lib/components/user";
+import AchievementsGrid from "$lib/components/achievements/AchievementsGrid.svelte";
+import type {
+	AchievementDto,
+	AchievementLeaderboardUserDto,
+	LeaderboardItem,
+} from "$lib/types";
 
-export type LeaderboardResponseDto =
-	components["schemas"]["LeaderboardResponseDto"];
-export type LeaderboardItem = LeaderboardResponseDto["leaderboard"][number];
-
-export const columns: ColumnDef<LeaderboardItem>[] = [
+export const hoursColumns: ColumnDef<LeaderboardItem>[] = [
 	{
 		accessorKey: "name",
-		header: "Имя",
-	},
-	{
-		accessorKey: "steam_id",
-		header: "Steam ID",
+		header: "Пользователь",
+		cell: ({ row }) =>
+			renderComponent(UserCard, {
+				name: row.original.name,
+				steam_id: row.original.steam_id,
+				avatar_hash: row.original.avatar_hash,
+				showLink: true,
+			}),
 	},
 	{
 		accessorKey: "playtime",
@@ -24,3 +30,38 @@ export const columns: ColumnDef<LeaderboardItem>[] = [
 		},
 	},
 ];
+
+// Alias for backward compatibility
+export const columns = hoursColumns;
+
+export const getAchievementsColumns = (params: {
+	achievements: Record<string, AchievementDto>;
+	appid: string;
+}): ColumnDef<AchievementLeaderboardUserDto>[] => [
+	{
+		accessorKey: "name",
+		header: "Пользователь",
+		cell: ({ row }) =>
+			renderComponent(UserCard, {
+				name: row.original.name,
+				steam_id: row.original.steam_id,
+				avatar_hash: row.original.avatar_hash,
+				showLink: true,
+			}),
+	},
+	{
+		accessorKey: "unlocked_count",
+		header: "Достижения",
+		cell: ({ row }) =>
+			renderComponent(AchievementsGrid, {
+				data: {
+					achievements: params.achievements,
+					leaderboard: row.original,
+				},
+				appid: params.appid,
+			}),
+	},
+];
+
+export const achievementsColumns = getAchievementsColumns;
+

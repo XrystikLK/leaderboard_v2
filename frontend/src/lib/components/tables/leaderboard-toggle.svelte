@@ -1,23 +1,22 @@
 <script lang="ts">
-import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
 import { Clock, Trophy } from "@lucide/svelte";
+import * as ToggleGroup from "$lib/components/ui/toggle-group/index.js";
 
 export type LeaderboardMode = "hours" | "achievements";
 
 let {
 	value = $bindable("hours"),
-	class: className = "",
 }: {
 	value?: LeaderboardMode;
-	class?: string;
 } = $props();
 </script>
 
 <ToggleGroup.Root
 	type="single"
-	bind:value={value as never}
 	variant="outline"
-	class={className}
+	onValueChange={(v) => {
+		if (v) value = v as LeaderboardMode
+	}}
 >
 	<ToggleGroup.Item value="hours" aria-label="Статистика по часам">
 		<Clock data-icon="inline-start" />
