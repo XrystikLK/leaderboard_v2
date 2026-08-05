@@ -1,7 +1,8 @@
 import type { ColumnDef } from "@tanstack/table-core";
+import AchievementProgress from "$lib/components/achievements/AchievementProgress.svelte";
+import AchievementsGrid from "$lib/components/achievements/AchievementsGrid.svelte";
 import { renderComponent } from "$lib/components/ui/data-table/index.js";
 import { UserCard } from "$lib/components/user";
-import AchievementsGrid from "$lib/components/achievements/AchievementsGrid.svelte";
 import type {
 	AchievementDto,
 	AchievementLeaderboardUserDto,
@@ -50,6 +51,18 @@ export const getAchievementsColumns = (params: {
 			}),
 	},
 	{
+		accessorKey: "progress",
+		header: "Прогресс",
+		cell: ({ row }) => {
+			const total = Object.keys(params.achievements ?? {}).length;
+			const unlocked = row.original.unlocked_count ?? 0;
+			return renderComponent(AchievementProgress, {
+				value: unlocked,
+				max: total,
+			});
+		},
+	},
+	{
 		accessorKey: "unlocked_count",
 		header: "Достижения",
 		cell: ({ row }) =>
@@ -64,4 +77,3 @@ export const getAchievementsColumns = (params: {
 ];
 
 export const achievementsColumns = getAchievementsColumns;
-
