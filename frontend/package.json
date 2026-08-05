@@ -40,8 +40,10 @@
 		"zod": "^4.4.3"
 	},
 	"dependencies": {
+		"@humanspeak/svelte-virtual-list": "^0.5.13",
 		"@tanstack/svelte-query": "^6.1.36",
 		"@tanstack/svelte-query-devtools": "^6.1.36",
-		"openapi-fetch": "^0.17.0"
+		"openapi-fetch": "^0.17.0",
+		"runed": "^0.37.1"
 	}
 }

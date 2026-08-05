@@ -11,6 +11,7 @@ import DataTable from "$lib/components/tables/data-table.svelte";
 import LeaderboardToggle, {
 	type LeaderboardMode,
 } from "$lib/components/tables/leaderboard-toggle.svelte";
+import { friendsSidebar } from "$lib/state/friends-sidebar.svelte";
 
 let selectedGames = $state("");
 let input = $state<HTMLInputElement>();
@@ -53,7 +54,6 @@ const achievementsLeaderboardQuery = createQuery(() => ({
 	},
 	enabled: !!selectedGames && tableType === "achievements",
 }));
-
 </script>
 
 <input bind:this={input} class="bg-lime-500" placeholder="appid...">
@@ -85,3 +85,8 @@ const achievementsLeaderboardQuery = createQuery(() => ({
 		/>
 	{/if}
 {/if}
+<button
+	onclick={() => friendsSidebar.ref.scroll({ index: 25, smoothScroll: true })}
+>
+	test go to
+</button>
