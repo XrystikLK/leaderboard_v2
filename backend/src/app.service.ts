@@ -29,6 +29,7 @@ import type {
 	Leaderboard,
 	LeaderboardResponseDto,
 	UserDto,
+	UserGameDto,
 } from "./dto/app-responses.dto";
 import { SteamApiService } from "./steam-api/steam-api.service";
 @Injectable()
@@ -504,12 +505,24 @@ export class SteamService {
 		return match ? [match[1] as "id" | "profiles", match[2]] : null;
 	}
 
-	async getUserGamesFromDB(id: string) {
-		const data = await this.fetchDb(
-			this.supabase.from("game_stats").select(`games (*)`).eq("steam_id", id),
+	async getUserGamesFromDB(id: string): Promise<UserGameDto[]> {
+		type DbGameRow = {
+			playtime_forever: string;
+			games: Omit<UserGameDto, "playtime_forever">;
+		};
+
+		const data = await this.fetchDb<DbGameRow[]>(
+			this.supabase
+				.from("game_stats")
+				.select("playtime_forever, games (*)")
+				.eq("steam_id", id)
+				.returns<DbGameRow[]>(),
 			"Failed to fetch user games from database",
 		);
-		return data.map((game) => game.games);
+		return data.map((game) => ({
+			...game.games,
+			playtime_forever: game.playtime_forever,
+		}));
 	}
 
 	async getHoursLeaderboard(

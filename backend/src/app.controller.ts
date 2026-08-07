@@ -8,6 +8,7 @@ import {
 	LeaderboardResponseDto,
 	ResolveURLResponseDto,
 	UserDto,
+	UserGameDto,
 } from "./dto/app-responses.dto";
 import { SteamApiService } from "./steam-api/steam-api.service";
 @Controller("steam")
@@ -25,8 +26,9 @@ export class AppController {
     return {leaderboard: steam_id}
   }
 
+	@ApiOkResponse({ type: [UserGameDto] })
 	@Get('/games/:steamid')
-  async getOwnedGames(@Param('steamid') id: string) {
+  async getOwnedGames(@Param('steamid') id: string): Promise<UserGameDto[]> {
     return this.steamService.getUserGamesFromDB(id);
   }
 
@@ -70,4 +72,13 @@ export class AppController {
     console.log(steamid);
     return this.steamService.loadUser(steamid);
   }
+
+	@ApiOkResponse({ type: ResolveURLResponseDto })
+	@Get("/resolveURL/:id")
+	async resolveUrl(
+		@Param("id") id: string,
+	): Promise<ResolveURLResponseDto> {
+		const steamId = await this.steamService.getUserSteamId(id);
+		return { steam_id: steamId };
+	}
 }

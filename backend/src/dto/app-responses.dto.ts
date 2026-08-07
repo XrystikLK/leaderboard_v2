@@ -96,3 +96,17 @@ export class AchievementsLeaderboard {
 	@ApiProperty({ type: [AchievementLeaderboardUserDto] })
 	leaderboard: AchievementLeaderboardUserDto[];
 }
+
+export class UserGameDto {
+	@ApiProperty()
+	id: string;
+
+	@ApiProperty()
+	name: string;
+
+	@ApiProperty()
+	icon_url: string;
+
+	@ApiProperty()
+	playtime_forever: string;
+}
