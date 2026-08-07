@@ -11,11 +11,13 @@ import DataTable from "$lib/components/tables/data-table.svelte";
 import LeaderboardToggle, {
 	type LeaderboardMode,
 } from "$lib/components/tables/leaderboard-toggle.svelte";
+import GamesSelector from "$lib/components/user/UserGamesPopover.svelte";
 import { friendsSidebar } from "$lib/state/friends-sidebar.svelte";
 
 let selectedGames = $state("");
 let input = $state<HTMLInputElement>();
 let tableType = $state<LeaderboardMode>("hours");
+let isGamesSelectorOpen = $state(false);
 
 const leaderboardQuery = createQuery(() => ({
 	queryKey: ["leaderboard-hours", page.params.steamid, selectedGames],
@@ -85,8 +87,12 @@ const achievementsLeaderboardQuery = createQuery(() => ({
 		/>
 	{/if}
 {/if}
-<button
-	onclick={() => friendsSidebar.ref.scroll({ index: 25, smoothScroll: true })}
->
-	test go to
-</button>
+
+<GamesSelector bind:open={isGamesSelectorOpen} bind:selectedAppId={selectedGames}>
+	{#snippet buttonSnippet()}
+		<div class="flex w-50 justify-end">
+			<p class="text-amber-500 w-20 mx-auto">Выбрать игру</p>
+		</div>
+	{/snippet}
+</GamesSelector> 
+
