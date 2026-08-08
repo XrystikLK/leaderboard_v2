@@ -45,11 +45,9 @@ export const getAchievementsColumns = (params: {
 		cell: ({ row }) =>
 			renderComponent(UserCard, {
 				name: row.original.name,
-				steam_id: row.original.steam_id,
 				avatar_hash: row.original.avatar_hash,
-				showLink: true,
 			}),
-	},
+	}, 
 	{
 		accessorKey: "progress",
 		header: "Прогресс",

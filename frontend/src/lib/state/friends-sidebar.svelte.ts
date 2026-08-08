@@ -15,12 +15,14 @@ type ListRef = {
 
 export const friendsSidebar = $state<{
 	ref: ListRef | undefined;
+	searchValue: string;
 	scrollToSteamName: (
 		friends: { name: string; [key: string]: any }[],
 		targetSteamName: string,
 	) => { name?: string; [key: string]: any } | undefined;
 }>({
 	ref: undefined,
+	searchValue: "",
 	scrollToSteamName(friends, targetSteamName) {
 		if (!targetSteamName) return undefined;
 

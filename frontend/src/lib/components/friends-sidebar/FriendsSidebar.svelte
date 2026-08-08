@@ -32,7 +32,6 @@ const userFriends = createQuery(() => ({
 }));
 
 let copiedSteamId = $state<string | null>(null);
-let searchValue = $state("");
 let searchedUser = $state();
 
 async function copyToClipboard(id: string) {
@@ -50,13 +49,13 @@ async function copyToClipboard(id: string) {
 }
 
 $effect(() => {
-	searchValue;
+	friendsSidebar.searchValue;
 	if (userFriends.isSuccess)
 		untrack(
 			() =>
 				(searchedUser = friendsSidebar.scrollToSteamName(
 					userFriends.data,
-					searchValue,
+					friendsSidebar.searchValue,
 				)),
 		);
 });
@@ -79,7 +78,7 @@ $effect(() => {
 						{userFriends.data.length}
 					</span>
 				{/if}
-				<Search bind:value={searchValue} />
+				<Search bind:value={friendsSidebar.searchValue} />
 			</h2>
 		</div>
 	</Sidebar.Header>

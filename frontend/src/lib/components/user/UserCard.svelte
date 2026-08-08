@@ -1,5 +1,6 @@
 <script lang="ts">
 import { Check, Copy, ExternalLink } from "@lucide/svelte";
+import { friendsSidebar } from "$lib/state/friends-sidebar.svelte";
 
 interface Props {
 	name: string;
@@ -54,10 +55,12 @@ async function copySteamId() {
 		alt={name}
 		onerror={(e) => ((e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR)}
 		class="rounded-lg object-cover ring-1 ring-border shrink-0 {size === 'sm' ? 'size-8' : size === 'lg' ? 'size-12' : 'size-10'}"
-	/>
+	>
 	<div class="min-w-0 flex-1">
 		<div class="flex items-center gap-1.5">
-			<span class="font-bold text-foreground truncate {size === 'sm' ? 'text-xs' : 'text-sm'}">
+			<span
+				class="font-bold text-foreground truncate {size === 'sm' ? 'text-xs' : 'text-sm'}"
+			>
 				{name}
 			</span>
 			{#if showLink}
@@ -73,7 +76,9 @@ async function copySteamId() {
 			{/if}
 		</div>
 		<div class="flex items-center gap-1 mt-0.5 text-muted-foreground">
-			<span class="font-mono bg-muted/60 px-1.5 py-0.5 rounded border border-border text-[10px] truncate max-w-[140px]">
+			<span
+				class="font-mono bg-muted/60 px-1.5 py-0.5 rounded border border-border text-[10px] truncate max-w-[140px]"
+			>
 				{effectiveSteamId}
 			</span>
 			{#if showCopy}
@@ -90,6 +95,14 @@ async function copySteamId() {
 					{/if}
 				</button>
 			{/if}
+			<button
+				type="button"
+				onclick={() => {
+					friendsSidebar.searchValue = name
+			}}
+			>
+				перейти
+			</button>
 		</div>
 	</div>
 </div>
